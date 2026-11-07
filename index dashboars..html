@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>דאשבורד ניהול לידים חכם</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+  :root{
+    --nx-bg:#0a0f2c; --nx-panel:#111a40; --nx-panel2:#0d1538; --nx-border:#22306b;
+    --nx-text:#e7ecff; --nx-muted:#8891c0; --nx-green:#39ff8c; --nx-cyan:#22d3ee;
+    --nx-amber:#fbbf24; --nx-pink:#ff4d8d;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--nx-bg); color:var(--nx-text);
+    font-family:-apple-system,"Segoe UI",Arial,sans-serif; line-height:1.5;
+    padding:24px;
+  }
+  h1{font-size:22px; margin:0 0 4px;}
+  .sub{color:var(--nx-muted); font-size:13px; margin-bottom:20px;}
+  .grid{display:grid; gap:16px;}
+  .kpis{grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); margin-bottom:20px;}
+  .charts{grid-template-columns:1fr 1fr; margin-top:20px;}
+  @media (max-width:720px){ .charts{grid-template-columns:1fr;} }
+  .card{
+    background:var(--nx-panel); border:1px solid var(--nx-border); border-radius:12px;
+    padding:16px; border-inline-start:3px solid var(--accent,var(--nx-cyan));
+  }
+  .kpi-label{color:var(--nx-muted); font-size:12px; margin-bottom:6px;}
+  .kpi-value{font-size:26px; font-weight:700;}
+  .card-title{font-weight:600; margin-bottom:12px; font-size:14px;}
+  .green{color:var(--nx-green); font-weight:400; font-size:12px;}
+  table{width:100%; border-collapse:collapse; font-size:13px;}
+  th{color:var(--nx-cyan); font-weight:600; text-align:start; padding:8px 6px; border-bottom:1px solid var(--nx-border);}
+  td{padding:8px 6px; border-bottom:1px solid var(--nx-border);}
+  tr:hover td{background:var(--nx-panel2);}
+  @media (max-width:640px){ th:nth-child(3),td:nth-child(3),th:nth-child(5),td:nth-child(5){display:none;} }
+  .loading{color:var(--nx-muted); padding:40px; text-align:center;}
+  .bar{fill-opacity:.9;}
+  .axis text{fill:var(--nx-muted); font-size:11px;}
+  .axis path,.axis line{stroke:var(--nx-border);}
+  .line-path{fill:none; stroke:var(--nx-green); stroke-width:2;}
+  .dot{fill:var(--nx-cyan);}
+</style>
+</head>
+<body>
+  <h1>דאשבורד ניהול לידים חכם</h1>
+  <div class="sub">פרויקט תרגול שנבנה בעזרת Claude · נתוני דמה (Mock data)</div>
+
+  <div id="kpis" class="grid kpis"><div class="loading">טוען נתונים...</div></div>
+
+  <div class="card" style="--accent:var(--nx-green);">
+    <div class="card-title">לידים אחרונים <span class="green">● חדש בראש הרשימה</span></div>
+    <div style="overflow-x:auto;">
+      <table id="leads-table">
+        <thead>
+          <tr>
+            <th>מזהה</th><th>שם</th><th>מקור</th><th>שלב</th><th>נציג</th><th>נוצר</th><th>ערך (₪)</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="grid charts">
+    <div class="card" style="--accent:var(--nx-cyan);">
+      <div class="card-title">התפלגות לפי שלב</div>
+      <div id="funnel-chart"></div>
+    </div>
+    <div class="card" style="--accent:var(--nx-amber);">
+      <div class="card-title">לידים לפי מקור</div>
+      <div id="source-chart"></div>
+    </div>
+  </div>
+  <div class="card" style="--accent:var(--nx-pink); margin-top:16px;">
+    <div class="card-title">מגמה שבועית</div>
+    <div id="week-chart"></div>
+  </div>
+
+<script>
+d3.csv("./leads.csv").then(function(data){
+  data.forEach(d=>{ d.deal_value = +d.deal_value; d.created_date = new Date(d.created_date); });
+
+  // ---- KPIs ----
+  const total = data.length;
+  const closed = data.filter(d=>d.stage==="נסגר - עסקה").length;
+  const totalValue = d3.sum(data, d=>d.deal_value);
+  const kpis = [
+    {label:"סה\"כ לידים", value: total, accent:"var(--nx-cyan)"},
+    {label:"עסקאות שנסגרו", value: closed, accent:"var(--nx-green)"},
+    {label:"שיעור המרה", value: (total? Math.round(closed/total*100):0)+"%", accent:"var(--nx-amber)"},
+    {label:"שווי כולל (₪)", value: totalValue.toLocaleString(), accent:"var(--nx-pink)"},
+  ];
+  const kw = d3.select("#kpis").html("");
+  kpis.forEach(k=>{
+    kw.append("div").attr("class","card").style("--accent",k.accent).html(
+      `<div class="kpi-label">${k.label}</div><div class="kpi-value">${k.value}</div>`
+    );
+  });
+
+  // ---- Table (newest first) ----
+  const sorted = [...data].sort((a,b)=>b.created_date-a.created_date).slice(0,15);
+  const tbody = d3.select("#leads-table tbody");
+  sorted.forEach(d=>{
+    tbody.append("tr").html(
+      `<td>${d.lead_id}</td><td>${d.name}</td><td>${d.source}</td><td>${d.stage}</td><td>${d.agent}</td><td>${d.created_date.toLocaleDateString("he-IL")}</td><td>${d.deal_value.toLocaleString()}</td>`
+    );
+  });
+
+  // ---- by_stage (bar) ----
+  const byStage = d3.rollups(data, v=>v.length, d=>d.stage).map(([stage,count])=>({stage,count}));
+  drawBar("#funnel-chart", byStage, "stage", "count", "var(--nx-cyan)");
+
+  // ---- by_source (bar) ----
+  const bySource = d3.rollups(data, v=>v.length, d=>d.source).map(([source,count])=>({source,count}));
+  drawBar("#source-chart", bySource, "source", "count", "var(--nx-amber)");
+
+  // ---- by_week (line) ----
+  const byWeek = d3.rollups(data, v=>v.length, d=>d3.timeFormat("%Y-%W")(d.created_date))
+    .map(([week,count])=>({week,count})).sort((a,b)=>a.week.localeCompare(b.week));
+  drawLine("#week-chart", byWeek, "week", "count");
+
+  function drawBar(sel, rows, xKey, yKey, color){
+    const el = d3.select(sel); el.html("");
+    const width = el.node().clientWidth || 320, height = 240;
+    const margin = {top:10,right:10,bottom:60,left:35};
+    const svg = el.append("svg").attr("width",width).attr("height",height);
+    const x = d3.scaleBand().domain(rows.map(d=>d[xKey])).range([margin.left,width-margin.right]).padding(0.3);
+    const y = d3.scaleLinear().domain([0, d3.max(rows,d=>d[yKey])||1]).nice().range([height-margin.bottom,margin.top]);
+    svg.append("g").attr("class","axis").attr("transform",`translate(0,${height-margin.bottom})`)
+      .call(d3.axisBottom(x)).selectAll("text").attr("transform","rotate(-30)").style("text-anchor","end");
+    svg.append("g").attr("class","axis").attr("transform",`translate(${margin.left},0)`).call(d3.axisLeft(y).ticks(4));
+    svg.selectAll(".bar").data(rows).join("rect").attr("class","bar")
+      .attr("x",d=>x(d[xKey])).attr("y",d=>y(d[yKey])).attr("width",x.bandwidth())
+      .attr("height",d=>height-margin.bottom-y(d[yKey])).attr("fill",color).attr("rx",3);
+  }
+
+  function drawLine(sel, rows, xKey, yKey){
+    const el = d3.select(sel); el.html("");
+    const width = el.node().clientWidth || 600, height = 200;
+    const margin = {top:10,right:20,bottom:30,left:35};
+    const svg = el.append("svg").attr("width",width).attr("height",height);
+    const x = d3.scalePoint().domain(rows.map(d=>d[xKey])).range([margin.left,width-margin.right]);
+    const y = d3.scaleLinear().domain([0, d3.max(rows,d=>d[yKey])||1]).nice().range([height-margin.bottom,margin.top]);
+    svg.append("g").attr("class","axis").attr("transform",`translate(0,${height-margin.bottom})`)
+      .call(d3.axisBottom(x).tickValues(x.domain().filter((d,i)=>i%2===0)));
+    svg.append("g").attr("class","axis").attr("transform",`translate(${margin.left},0)`).call(d3.axisLeft(y).ticks(4));
+    const line = d3.line().x(d=>x(d[xKey])).y(d=>y(d[yKey]));
+    svg.append("path").datum(rows).attr("class","line-path").attr("d",line);
+    svg.selectAll(".dot").data(rows).join("circle").attr("class","dot")
+      .attr("cx",d=>x(d[xKey])).attr("cy",d=>y(d[yKey])).attr("r",3);
+  }
+
+}).catch(function(err){
+  d3.select("#kpis").html("<div class='loading'>שגיאה בטעינת הנתונים: ודאי שקובץ leads.csv נמצא באותה תיקייה.</div>");
+  console.error(err);
+});
+</script>
+</body>
+</html>
