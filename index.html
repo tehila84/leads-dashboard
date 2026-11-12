@@ -46,7 +46,7 @@
 </head>
 <body>
   <h1>דאשבורד ניהול לידים חכם</h1>
-  <div class="sub">פרויקט תרגול שנבנה בעזרת Claude · נתוני דמה (Mock data)</div>
+  <div class="sub">פרויקט תרגול שנבנה בעזרת Claude · נתונים חיים מ-Airtable</div>
 
   <div id="kpis" class="grid kpis"><div class="loading">טוען נתונים...</div></div>
 
@@ -80,7 +80,27 @@
   </div>
 
 <script>
-d3.csv("./leads.csv").then(function(data){
+// --- חיבור ל-Airtable: שולף את נתוני הלידים ישירות מבסיס הנתונים החי ---
+const AIRTABLE_BASE_ID = "appi4g44gj5srBrlA";
+const AIRTABLE_TABLE_ID = "tblHfgZQ7i9T0jZMk";
+const AIRTABLE_TOKEN = "patob8m1eOkJCKzpC.f9b1283998cf78f440e708cbd04142438b1f68d96a2fd385ec179647a603f31d";
+
+async function fetchLeadsFromAirtable(){
+  let records = [];
+  let offset;
+  do {
+    const url = new URL(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_TABLE_ID}`);
+    if (offset) url.searchParams.set("offset", offset);
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${AIRTABLE_TOKEN}` } });
+    if (!res.ok) throw new Error("Airtable API error: " + res.status);
+    const json = await res.json();
+    records = records.concat(json.records);
+    offset = json.offset;
+  } while (offset);
+  return records.map(r => r.fields);
+}
+
+fetchLeadsFromAirtable().then(function(data){
   data.forEach(d=>{ d.deal_value = +d.deal_value; d.created_date = new Date(d.created_date); });
 
   // ---- KPIs ----
@@ -154,7 +174,7 @@ d3.csv("./leads.csv").then(function(data){
   }
 
 }).catch(function(err){
-  d3.select("#kpis").html("<div class='loading'>שגיאה בטעינת הנתונים: ודאי שקובץ leads.csv נמצא באותה תיקייה.</div>");
+  d3.select("#kpis").html("<div class='loading'>שגיאה בטעינת הנתונים מ-Airtable. ודאי שהטוקן תקין ושלבסיס יש הרשאת קריאה.</div>");
   console.error(err);
 });
 </script>
