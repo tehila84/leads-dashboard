@@ -81,9 +81,11 @@
 
 <script>
 // --- חיבור ל-Airtable: שולף את נתוני הלידים ישירות מבסיס הנתונים החי ---
-const AIRTABLE_BASE_ID = "appi4g44gj5srBrlA";
+// הערכים האלה מוזרקים אוטומטית בזמן הפרסום על ידי GitHub Actions,
+// מתוך GitHub Secrets (AIRTABLE_TOKEN, AIRTABLE_BASE) - הם לא שמורים כאן בקוד.
+const AIRTABLE_BASE_ID = "__AIRTABLE_BASE__";
 const AIRTABLE_TABLE_ID = "tblHfgZQ7i9T0jZMk";
-const AIRTABLE_TOKEN = "patob8m1eOkJCKzpC.f9b1283998cf78f440e708cbd04142438b1f68d96a2fd385ec179647a603f31d";
+const AIRTABLE_TOKEN = "__AIRTABLE_TOKEN__";
 
 async function fetchLeadsFromAirtable(){
   let records = [];
