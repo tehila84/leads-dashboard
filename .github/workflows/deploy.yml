@@ -32,10 +32,10 @@ jobs:
       - name: Inject secrets into dashboard
         env:
           AIRTABLE_TOKEN: ${{ secrets.AIRTABLE_TOKEN }}
-          AIRTABLE_BASE: ${{ secrets.AIRTABLE_BASE }}
+          AIRTABLE_BASE_ID: ${{ secrets.AIRTABLE_BASE_ID }}
         run: |
           sed -i "s/__AIRTABLE_TOKEN__/${AIRTABLE_TOKEN}/g" dist/index.html
-          sed -i "s/__AIRTABLE_BASE__/${AIRTABLE_BASE}/g" dist/index.html
+          sed -i "s/__AIRTABLE_BASE__/${AIRTABLE_BASE_ID}/g" dist/index.html
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
