@@ -127,7 +127,7 @@ fetchLeadsFromAirtable().then(function(data){
   const tbody = d3.select("#leads-table tbody");
   sorted.forEach(d=>{
     tbody.append("tr").html(
-      `<td>${d.lead_id}</td><td>${d.name}</td><td>${d.source}</td><td>${d.stage}</td><td>${d.agent}</td><td>${d.created_date.toLocaleDateString("he-IL")}</td><td>${d.deal_value.toLocaleString()}</td>`
+      `<td>${d.lead_id && d.lead_id.length > 10 ? "F-" + d.lead_id.slice(-5) : d.lead_id}</td><td>${d.name}</td><td>${d.source}</td><td>${d.stage}</td><td>${d.agent || "לא שויך"}</td><td>${d.created_date.toLocaleDateString("he-IL")}</td><td>${d.deal_value.toLocaleString()}</td>`
     );
   });
 
